@@ -27,6 +27,13 @@ public class Network {
         }
     }
 
+    public void start() {
+        for (Node node : nodes) {
+            Thread thread = new Thread(node);
+            thread.start();
+        }
+    }
+
     public boolean isConnected() {
         if (nodes.isEmpty()) {
             return false;
