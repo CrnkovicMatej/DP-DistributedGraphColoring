@@ -1,7 +1,9 @@
 package com.project.network;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class Node implements Runnable {
     private int id;
@@ -14,6 +16,8 @@ public class Node implements Runnable {
         this.id = id;
         this.neighbors = new ArrayList<>();
         this.messageQueue = new ArrayList<>();
+        this.color = 0; // 0 means uncolored
+        this.colored = false;
     }
 
     public int getId() {
@@ -30,6 +34,10 @@ public class Node implements Runnable {
         }
     }
 
+    public int getColor() {
+        return color;
+    }
+
     public synchronized void sendMessage(Node target, Message message) {
         if (neighbors.contains(target)) {
             target.receiveMessage(message);
@@ -43,7 +51,8 @@ public class Node implements Runnable {
 
     @Override
     public void run() {
-        while (true) {
+        System.out.println("Node " + id + " started.");
+        while (!Thread.currentThread().isInterrupted()) {
             processMessages();
             try {
                 Thread.sleep(1000); 
@@ -55,9 +64,35 @@ public class Node implements Runnable {
     }
 
     private synchronized void processMessages() {
+        if (messageQueue.isEmpty()) {
+            return;
+        }
+
+        Set<Integer> usedColors = new HashSet<>();
+        
         while (!messageQueue.isEmpty()) {
             Message message = messageQueue.remove(0);
             System.out.println("Node " + id + " processed message: " + message.getContent());
+
+            String[] parts = message.getContent().split(" ");
+            int neighborColor = Integer.parseInt(parts[parts.length - 1]);
+            usedColors.add(neighborColor);
+        }
+
+        if (!colored) {
+            int newColor = 1;
+            while (usedColors.contains(newColor)) {
+                newColor++;
+            }
+            color = newColor;
+            colored = true;
+
+            System.out.println("Node " + id + " colored with color: " + color);
+
+            for (Node neighbor : neighbors) {
+                Message message = new Message("Color of node " + id + " is " + color, this, neighbor);
+                sendMessage(neighbor, message);
+            }
         }
     }
 }
