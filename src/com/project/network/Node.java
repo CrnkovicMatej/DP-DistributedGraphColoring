@@ -11,13 +11,17 @@ public class Node implements Runnable {
     private List<Message> messageQueue;
     private int color;
     private boolean colored;
+    private String algorithm;
+    private int maxColors;
 
-    public Node(int id) {
+    public Node(int id, String algorithm, int maxColors) {
         this.id = id;
         this.neighbors = new ArrayList<>();
         this.messageQueue = new ArrayList<>();
         this.color = 0; // 0 means uncolored
         this.colored = false;
+        this.algorithm = algorithm;
+        this.maxColors = maxColors;
     }
 
     public int getId() {
@@ -68,6 +72,14 @@ public class Node implements Runnable {
             return;
         }
 
+        if ("color".equalsIgnoreCase(algorithm)) {
+            runColoringAlgorithm();
+        } else if ("maximal".equalsIgnoreCase(algorithm)) {
+            runMaximalIndependentSetAlgorithm();
+        }
+    }
+
+    private void runColoringAlgorithm() {
         Set<Integer> usedColors = new HashSet<>();
         
         while (!messageQueue.isEmpty()) {
@@ -76,10 +88,12 @@ public class Node implements Runnable {
 
             String[] parts = message.getContent().split(" ");
             int neighborColor = Integer.parseInt(parts[parts.length - 1]);
+            System.out.println("Neighbor color is: " + neighborColor);
             usedColors.add(neighborColor);
         }
 
         if (!colored) {
+            System.out.println("COLORED IS FALSE!");
             int newColor = 1;
             while (usedColors.contains(newColor)) {
                 newColor++;
@@ -94,5 +108,32 @@ public class Node implements Runnable {
                 sendMessage(neighbor, message);
             }
         }
+    }
+
+    private void runMaximalIndependentSetAlgorithm() {
+        if (!colored) {
+            boolean allNeighborsUncolored = true;
+            for (Node neighbor : neighbors) {
+                if (neighbor.isColored()) {
+                    allNeighborsUncolored = false;
+                    break;
+                }
+            }
+
+            if (allNeighborsUncolored) {
+                color = 1; 
+                colored = true;
+                System.out.println("Node " + id + " is part of the maximal independent set");
+
+                for (Node neighbor : neighbors) {
+                    Message message = new Message("Node " + id + " is in the MIS", this, neighbor);
+                    sendMessage(neighbor, message);
+                }
+            }
+        }
+    }
+
+    public boolean isColored() {
+        return colored;
     }
 }
