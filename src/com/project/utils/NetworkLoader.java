@@ -1,6 +1,7 @@
 package com.project.utils;
 
-import com.project.network.*;
+import com.project.network.Node;
+import com.project.network.Network;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -18,23 +19,21 @@ public class NetworkLoader {
     public Network loadTopology() throws IOException {
         Network network = new Network();
 
-        // nodes loading
         try (BufferedReader reader = new BufferedReader(new FileReader(nodesFilePath))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (!line.equals("id")) { // skip over the header line
+                if (!line.equals("id")) { 
                     int id = Integer.parseInt(line.trim());
-                    Node node = new Node(id);
+                    Node node = new Node(id, "color", Integer.MAX_VALUE);
                     network.addNode(node);
                 }
             }
         }
 
-        // links loading
         try (BufferedReader reader = new BufferedReader(new FileReader(linksFilePath))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (!line.equals("source,destination")) { // skip over the header line
+                if (!line.equals("source,destination")) { 
                     String[] parts = line.split(",");
                     int sourceId = Integer.parseInt(parts[0].trim());
                     int destinationId = Integer.parseInt(parts[1].trim());

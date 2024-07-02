@@ -34,6 +34,7 @@ public class Main {
         }
 
         for (Node node : network.getNodes()) {
+            // Reinitialize nodes with the algorithm and maxColors
             Node newNode = new Node(node.getId(), algorithm, maxColors);
             newNode.getNeighbors().addAll(node.getNeighbors());
             network.getNodes().set(network.getNodes().indexOf(node), newNode);
@@ -41,12 +42,5 @@ public class Main {
 
         network.start();
         System.out.println("Network has started.");
-
-        for (Node node : network.getNodes()) {
-            for (Node neighbor : node.getNeighbors()) {
-                Message message = new Message("Color of node " + node.getId() + " is " + node.getColor(), node, neighbor);
-                node.sendMessage(neighbor, message);
-            }
-        }
     }
 }

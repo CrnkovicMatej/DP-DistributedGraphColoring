@@ -30,9 +30,11 @@ public class Network {
     public void start() {
         for (Node node : nodes) {
             Thread thread = new Thread(node);
+            System.out.println("Starting thread for node " + node.getId());
             thread.start();
         }
     }
+
 
     public boolean isConnected() {
         if (nodes.isEmpty()) {
