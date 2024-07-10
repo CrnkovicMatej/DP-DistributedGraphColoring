@@ -129,6 +129,34 @@ public class Node implements Runnable {
         return messages;
     }
 
+    public List<Message> receiveAllCommMessages() {
+        List<Message> messages = new ArrayList<>();
+        Map<Node, Integer> receivedCounts = new HashMap<>();
+
+        while (receivedCounts.size() < com_with.size()) {
+            try {
+                messageSemaphore.acquire();
+
+                Message message;
+                while ((message = messageQueue.poll()) != null) {
+                    Node sender = message.getSender();
+                    receivedCounts.put(sender, receivedCounts.getOrDefault(sender, 0) + 1);
+
+                    if (receivedCounts.get(sender) == 1) {
+                        messages.add(message);
+                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + sender.getId());
+                    } else {
+                        System.out.println("Node " + id + " received duplicate message from Node " + sender.getId() + " and ignored it.");
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return messages;
+    }
+
     @Override
     public void run() {
         System.out.println("Node " + id + " started.");
