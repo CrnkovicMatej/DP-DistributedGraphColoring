@@ -107,7 +107,7 @@ public class LubyMis {
             if (node.isActive()) {
                 futures.add(executor.submit(() -> {
                     node.isSmallest = true;
-                    List<Message> messages = node.receiveAllMessages();
+                    List<Message> messages = node.receiveAllCommMessages();
                     for (Message message : messages) {
                         System.out.println("Vrijednost: " + Integer.valueOf(message.getContent()) + ", tip: " + message.getType());
                         if (message.getType() == Message.Type.RANDOM && Integer.valueOf(message.getContent()) < node.randomValue) {
@@ -145,7 +145,7 @@ public class LubyMis {
         for (Node node : nodes) {
             if (node.isActive()) {
                 futures.add(executor.submit(() -> {
-                    node.setMessageBuffer(node.receiveAllMessages());
+                    node.setMessageBuffer(node.receiveAllCommMessages());
                 }));
             }
         }
@@ -180,7 +180,7 @@ public class LubyMis {
         for (Node node : nodes) {
             if (node.isActive()) {
                 futures.add(executor.submit(() -> {
-                    node.setMessageBuffer(node.receiveAllMessages());
+                    node.setMessageBuffer(node.receiveAllCommMessages());
                 }));
             }
         }
