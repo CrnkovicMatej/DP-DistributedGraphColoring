@@ -5,13 +5,14 @@ public class Message {
     public enum Type { 
         DEFAULT,
         RANDOM,
-        SELECTED
+        SELECTED,
+        ELIMINATED
     }
 
     public Type type = Type.DEFAULT;
-    private String content;
-    private Node source;
-    private Node destination;
+    private final String content;
+    private final Node source;
+    private final Node destination;
 
     public Message(String content, Node source, Node destination) {
         this.content = content;
@@ -26,13 +27,12 @@ public class Message {
         this.destination = destination;
     }
 
+    public Node getSender(){return source;}
     public String getContent() {
         return content;
     }
 
-    public Node getSource() {
-        return source;
-    }
+    public Type getType() {return type;}
 
     public Node getDestination() {
         return destination;

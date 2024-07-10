@@ -1,38 +1,32 @@
 package com.project.network;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Node implements Runnable {
-    private int id;
-    public List<Node> neighbors;
-    // private BlockingQueue<Message> messageQueue; // BlockingQueue
-    private List<Message> messageQueue;
-    AtomicBoolean inMIS;
-    AtomicBoolean active;
-    int randomValue;
-    private Map<Integer, Integer> receivedColors; // Maps neighbor ID to color
+    public int id;
+    //public List<Node> neighbors;
+    private final Set<Node> neighbors = ConcurrentHashMap.newKeySet();
+    public final Set<Node> com_with = ConcurrentHashMap.newKeySet();
+    private final Queue<Message> messageQueue = new ConcurrentLinkedQueue<>();
+
+    private final Semaphore messageSemaphore = new Semaphore(0);
+
+    private List<Message> tempMessagesBuffer = new ArrayList<Message>();
+    private AtomicBoolean inMIS;
+    private AtomicBoolean active;
+    public int randomValue;
+    private Map<Integer, Integer> receivedColors;
     private int color;
     private boolean colored;
     private String algorithm;
     private int maxColors;
 
+    public boolean isSmallest;
+
     public Node(int id, String algorithm, int maxColors) {
         this.id = id;
-        this.neighbors = new ArrayList<>();
-        // this.messageQueue = new LinkedBlockingQueue<>(); //new ArrayList<>();
-        this.messageQueue = new ArrayList<>();
         this.receivedColors = new HashMap<>();
         this.color = id; // 0 means uncolored
         this.colored = false;
@@ -41,13 +35,43 @@ public class Node implements Runnable {
         this.inMIS = new AtomicBoolean(false);
         this.active = new AtomicBoolean(true);
     }
+    public boolean isInMIS() {
+        return inMIS.get();
+    }
+    public void setInMIS(boolean inMIS) {
+        this.inMIS.set(inMIS);
+    }
 
+    // Getter za active
+    public boolean isActive() {
+        return active.get();
+    }
+
+    // Setter za active
+    public void setActive(boolean active) {
+        this.active.set(active);
+    }
     public int getId() {
         return id;
     }
 
-    public List<Node> getNeighbors() {
+    public Set<Node> getNeighbors() {
         return neighbors;
+    }
+
+    public Set<Node> getCom_with() {
+        return com_with;
+    }
+
+    public void addCommunicator(Node comm)
+    {
+        if (!com_with.contains(comm)) {
+            com_with.add(comm);
+        }
+    }
+    public void removeCommunicator(Node comm)
+    {
+        com_with.remove(comm);
     }
 
     public void addNeighbor(Node neighbor) {
@@ -56,36 +80,51 @@ public class Node implements Runnable {
         }
     }
 
+    public List<Message> getMessageBuffer(){
+        return tempMessagesBuffer;
+    }
+
+    public void setMessageBuffer(List<Message> messages)
+    {
+        tempMessagesBuffer =  messages;
+    }
+
     public int getColor() {
         return color;
     }
 
-    public synchronized void sendMessage(Node target, Message message) {
+    public void sendMessage(Node target, Message message) {
         if (neighbors.contains(target)) {
             System.out.println("Node " + id + " sending message to " + target.getId() + ": " + message.getContent());
             target.receiveMessage(message);
         }
     }
 
-    public synchronized void receiveMessage(Message message) {
-        messageQueue.add(message);
-        System.out.println("usli u receive mess " + messageQueue);
-
-            // messageQueue.offer(message);
-        
+    public void receiveMessage(Message message) {
+        messageQueue.offer(message);
         System.out.println("Node " + id + " has " + messageQueue.size() + " messages in the queue.");
         System.out.println("Node " + id + " received message: " + message.getContent());
-        // processMessages(); // Process messages immediately after receiving
+        messageSemaphore.release();
     }
 
     public List<Message> receiveAllMessages() {
-        System.out.println("usli u receive all mesh");
         List<Message> messages = new ArrayList<>();
-        
-        // messageQueue.drainTo(messages);
-        System.out.println("nakon drain" + messageQueue);
-        for (Message message : messageQueue) {
-            System.out.println("Node " + this.id + " received " + message.type + "(" + message.getContent() + ")");
+        Set<Node> receivedFrom = new HashSet<>();
+        // we assume no more than 1 message per round
+        while (receivedFrom.size() < com_with.size()) {
+            try {
+                messageSemaphore.acquire();
+
+                Message message;
+                while ((message = messageQueue.poll()) != null) {
+                    messages.add(message);
+                    receivedFrom.add(message.getSender());
+                    System.out.println("Node " + id + " received message: " + message.getContent());
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
         return messages;
     }
@@ -107,27 +146,27 @@ public class Node implements Runnable {
                 }
             }
         } else if ("maximal".equalsIgnoreCase(algorithm)) {
-            runMaximalIndependentSetAlgorithm();
+            return;
         }
     }
 
     private synchronized void processMessages() {
         //System.out.println("Node " + id + " starts processing messages. Initial queue size: " + messageQueue.size());
-        while (!messageQueue.isEmpty()) {
-            System.out.println("Node " + id + " has " + messageQueue.size() + " messages left to process.");
-            Message message = messageQueue.remove(0);
-            // Message message = messageQueue.poll();
-            System.out.println("Node " + id + " processed message: " + message.getContent());
-
-            String[] parts = message.getContent().split(" ");
-            String messageType = parts[0];
-            if ("INIT".equals(messageType) || "COLOR".equals(messageType)) {
-                int neighborId = Integer.parseInt(parts[1]);
-                int neighborColor = Integer.parseInt(parts[2]);
-                receivedColors.put(neighborId, neighborColor);
-                System.out.println("Node " + id + " received color " + neighborColor + " from neighbor " + neighborId);
-            }
-        }
+//        while (!messageQueue.isEmpty()) {
+//            System.out.println("Node " + id + " has " + messageQueue.size() + " messages left to process.");
+//            //Message message = messageQueue.remove(0);
+//            // Message message = messageQueue.poll();
+//            System.out.println("Node " + id + " processed message: " + message.getContent());
+//
+//            String[] parts = message.getContent().split(" ");
+//            String messageType = parts[0];
+//            if ("INIT".equals(messageType) || "COLOR".equals(messageType)) {
+//                int neighborId = Integer.parseInt(parts[1]);
+//                int neighborColor = Integer.parseInt(parts[2]);
+//                receivedColors.put(neighborId, neighborColor);
+//                System.out.println("Node " + id + " received color " + neighborColor + " from neighbor " + neighborId);
+//            }
+//        }
         //System.out.println("Node " + id + " finished processing messages. Queue size now: " + messageQueue.size());
     }
 
@@ -169,148 +208,12 @@ public class Node implements Runnable {
         }
     }
 
-    private void runMaximalIndependentSetAlgorithm() {
-        if (!colored) {
-            boolean allNeighborsUncolored = true;
-            for (Node neighbor : neighbors) {
-                if (neighbor.isColored()) {
-                    allNeighborsUncolored = false;
-                    break;
-                }
-            }
-
-            if (allNeighborsUncolored) {
-                color = 1; 
-                colored = true;
-                System.out.println("Node " + id + " is part of the maximal independent set");
-
-                for (Node neighbor : neighbors) {
-                    Message message = new Message("Node " + id + " is in the MIS", this, neighbor);
-                    sendMessage(neighbor, message);
-                }
-            }
-        }
-    }
 
     public boolean isColored() {
         return colored;
     }
-
     public AtomicBoolean getInMIS() {
         return inMIS;
     }
 
-    public static void lubyMIS(List<Node> nodes, int numThreads) {
-        System.out.println("unutar misa");
-        ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-        Random random = new Random();
-
-        List<Future<?>> futures = new ArrayList<>();
-
-        while (true) {
-            // List<Future<?>> futures = new ArrayList<>();
-            AtomicBoolean hasActiveNodes = new AtomicBoolean(false);
-
-            // Round r: Nodes generate random values and send to neighbors
-            for (Node node : nodes) {
-                if (node.active.get()) {
-                    hasActiveNodes.set(true);
-                    futures.add(executor.submit(() -> {
-                        node.randomValue = random.nextInt(Integer.MAX_VALUE);
-                        System.out.println("Node " + node.id + " generated random value: " + node.randomValue);
-                        for (Node neighbor : node.neighbors) {
-                            if (neighbor.active.get()) {
-                                node.sendMessage(neighbor, new Message(Message.Type.RANDOM, String.valueOf(node.randomValue), node, neighbor));
-                            }
-                        }
-                    }));
-                }
-            }
-            System.out.println("Gotova runda R");
-            // Wait for round r to complete
-            waitForFutures(futures);
-            // Thread.sleep(2000);
-            futures.clear();
-
-            // Round r+1: Nodes decide if they join MIS based on neighbor random values
-            for (Node node : nodes) {
-                if (node.active.get()) {
-                    futures.add(executor.submit(() -> {
-                        boolean isSmallest = true;
-                        List<Message> messages = node.receiveAllMessages();
-                        for (Message message : messages) {
-                            System.out.println("vrijednost " + Integer.valueOf(message.getContent()) + "a tip je" + Integer.valueOf(message.getContent()).getClass());
-                            if (message.type == Message.Type.RANDOM && Integer.valueOf(message.getContent()) < node.randomValue) {
-                                isSmallest = false;
-                                break;
-                            }
-                        }
-                        if (isSmallest) {
-                            System.out.println("Node " + node.id + " joins the MIS");
-                            node.inMIS.set(true);
-                            node.active.set(false);
-                            for (Node neighbor : node.neighbors) {
-                                if (neighbor.active.get()) {
-                                    node.sendMessage(neighbor, new Message(Message.Type.SELECTED, "1", node, neighbor));
-                                }
-                            }
-                        } else {
-                            for (Node neighbor : node.neighbors) {
-                                if (neighbor.active.get()) {
-                                    node.sendMessage(neighbor, new Message(Message.Type.SELECTED, "0", node, neighbor));
-                                }
-                            }
-                        }
-                    }));
-                }
-            }
-            System.out.println("Gotova runda R+1");
-
-            // Wait for round r+1 to complete
-            waitForFutures(futures);
-            futures.clear();
-
-            // Round r+2: Nodes process elimination messages
-            for (Node node : nodes) {
-                if (node.active.get()) {
-                    futures.add(executor.submit(() -> {
-                        boolean neighborInMIS = false;
-                        List<Message> messages = node.receiveAllMessages();
-                        for (Message message : messages) {
-                            if (message.type == Message.Type.SELECTED && "1".equals(message.getContent())) {
-                                neighborInMIS = true;
-                                break;
-                            }
-                        }
-                        if (neighborInMIS) {
-                            System.out.println("Node " + node.id + " deactivates itself due to neighbor in MIS");
-                            node.active.set(false);
-                        }
-                    }));
-                }
-            }
-
-            // Wait for round r+2 to complete
-            System.out.println("Gotova runda R+2");
-
-            waitForFutures(futures);
-            futures.clear();
-
-            if (!hasActiveNodes.get()) {
-                break;
-            }
-        }
-
-        executor.shutdown();
-    }
-
-    private static void waitForFutures(List<Future<?>> futures) {
-        for (Future<?> future : futures) {
-            try {
-                future.get();
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-        }
-    }
 }

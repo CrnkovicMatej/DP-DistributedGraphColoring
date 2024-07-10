@@ -1,6 +1,7 @@
 package com.project;
 
 import com.project.network.*;
+import com.project.network.algorithms.LubyMis;
 import com.project.utils.*;
 
 import java.util.ArrayList;
@@ -29,32 +30,27 @@ public class Main {
             System.out.println("Error loading network topology: " + e.getMessage());
             return;
         }
+        if (!loader.validateTopology(network)) {
+            System.out.println("The network is not connected.");
+            return;
+        }
 
         if ("maximal".equals(algorithm)) { 
+            List<Node> nodes = network.getNodes();
+            LubyMis alg_luby = new LubyMis(nodes, nodes.size());
 
-                List<Node> nodes = new ArrayList<>();
-                for (Node node : network.getNodes()) {
-                    Node newNode = new Node(node.getId(), algorithm, 0);
-                    newNode.neighbors.addAll(node.getNeighbors());
-                    network.getNodes().set(network.getNodes().indexOf(node), newNode);
-                    nodes.add(newNode);
+            long startTime = System.nanoTime();
+            alg_luby.execute();
+            long endTime = System.nanoTime();
+            long durationInMillis = (endTime - startTime) / 1_000_000;
+            System.out.println("Execute method duration: " + durationInMillis + " ms");
+            System.out.println("Maximal Independent Set (MIS) results:");
+            for (Node node : network.getNodes()) {
+                if (node.getInMIS().get()) {
+                    System.out.println("Node " + node.getId() + " is in the MIS.");
                 }
-                // Execute Luby's algorithm
-                Node.lubyMIS(nodes, 4);
-
-                // Print the result
-                System.out.println("Maximal Independent Set (MIS) results:");
-                for (Node node : nodes) {
-                    if (node.getInMIS().get()) {
-                        System.out.println("Node " + node.getId() + " is in the MIS.");
-                    }
-                }
-        } else {
-
-            if (!loader.validateTopology(network)) {
-                System.out.println("The network is not fully connected.");
-                return;
             }
+        } else {
 
             for (Node node : network.getNodes()) {
                 // Reinitialize nodes with the algorithm and maxColors
