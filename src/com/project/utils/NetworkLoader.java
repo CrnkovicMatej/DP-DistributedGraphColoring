@@ -6,6 +6,7 @@ import com.project.network.Network;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Optional;
 
 public class NetworkLoader {
     private String nodesFilePath;
@@ -18,39 +19,43 @@ public class NetworkLoader {
 
     public Network loadTopology() throws IOException {
         Network network = new Network();
+        loadNodes(network);
+        loadLinks(network);
+        return network;
+    }
 
+    private void loadNodes(Network network) throws IOException {
         try (BufferedReader reader = new BufferedReader(new FileReader(nodesFilePath))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (!line.equals("id")) { 
+                if (!line.equals("id")) {
                     int id = Integer.parseInt(line.trim());
-                    Node node = new Node(id, "color", Integer.MAX_VALUE);
+                    Node node = new Node(id);
                     network.addNode(node);
                 }
             }
         }
+    }
 
+    private void loadLinks(Network network) throws IOException {
         try (BufferedReader reader = new BufferedReader(new FileReader(linksFilePath))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (!line.equals("source,destination")) { 
+                if (!line.equals("source,destination")) {
                     String[] parts = line.split(",");
                     int sourceId = Integer.parseInt(parts[0].trim());
                     int destinationId = Integer.parseInt(parts[1].trim());
 
-                    Node sourceNode = network.getNodes().stream().filter(n -> n.getId() == sourceId).findFirst().orElse(null);
-                    Node destinationNode = network.getNodes().stream().filter(n -> n.getId() == destinationId).findFirst().orElse(null);
+                    Optional<Node> sourceNode = network.getNodeById(sourceId);
+                    Optional<Node> destinationNode = network.getNodeById(destinationId);
 
-                    if (sourceNode != null && destinationNode != null) {
-                        network.connectNodes(sourceNode, destinationNode);
+                    if (sourceNode.isPresent() && destinationNode.isPresent()) {
+                        network.connectNodes(sourceNode.get(), destinationNode.get());
                     }
                 }
             }
         }
-
-        return network;
     }
-
     public boolean validateTopology(Network network) {
         return network.isConnected();
     }

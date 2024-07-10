@@ -5,9 +5,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-public class Node implements Runnable {
+public class Node  {
     public int id;
-    //public List<Node> neighbors;
     private final Set<Node> neighbors = ConcurrentHashMap.newKeySet();
     public final Set<Node> com_with = ConcurrentHashMap.newKeySet();
     private final Queue<Message> messageQueue = new ConcurrentLinkedQueue<>();
@@ -21,19 +20,13 @@ public class Node implements Runnable {
     public Map<Integer, Integer> receivedColors;
     public Map<Integer, Boolean> selected;
     private int color;
-    private boolean colored;
-    private String algorithm;
-    private int maxColors;
     public boolean isSmallest;
 
-    public Node(int id, String algorithm, int maxColors) {
+    public Node(int id) {
         this.id = id;
         this.receivedColors = new HashMap<>();
         this.selected = new HashMap<>();
-        this.color = id; // 0 means uncolored
-        this.colored = false;
-        this.algorithm = algorithm;
-        this.maxColors = maxColors;
+        this.color = id;
         this.inMIS = new AtomicBoolean(false);
         this.active = new AtomicBoolean(true);
     }
@@ -62,12 +55,10 @@ public class Node implements Runnable {
         this.inMIS.set(inMIS);
     }
 
-    // Getter za active
     public boolean isActive() {
         return active.get();
     }
 
-    // Setter za active
     public void setActive(boolean active) {
         this.active.set(active);
     }
@@ -133,8 +124,6 @@ public class Node implements Runnable {
         }
     }
 
-
-
     public void receiveMessage(Message message) {
         messageQueue.offer(message);
         System.out.println("Node " + id + " has " + messageQueue.size() + " messages in the queue.");
@@ -197,27 +186,6 @@ public class Node implements Runnable {
         }
         return messages;
     }
-
-    @Override
-    public void run() {
-        System.out.println("Node " + id + " started.");
-        if ("color".equalsIgnoreCase(algorithm)) {
-            System.out.println("Node " + id + " running coloring algorithm.");
-            while (!Thread.currentThread().isInterrupted()) {
-                System.out.println("Node " + id + " is in the thread loop.");
-                try {
-                    Thread.sleep(200); 
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-        } else if ("maximal".equalsIgnoreCase(algorithm)) {
-            return;
-        }
-    }
-
-
     public void waitForNeighboursColor(Node neighbor, int current_round) {
 
         while (true) {
@@ -278,10 +246,6 @@ public class Node implements Runnable {
         }
     }
 
-
-    public boolean isColored() {
-        return colored;
-    }
     public AtomicBoolean getInMIS() {
         return inMIS;
     }
