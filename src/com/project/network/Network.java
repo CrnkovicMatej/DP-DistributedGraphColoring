@@ -2,6 +2,7 @@ package com.project.network;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class Network {
     private List<Node> nodes;
@@ -24,14 +25,6 @@ public class Network {
         if (nodes.contains(node1) && nodes.contains(node2)) {
             node1.addNeighbor(node2);
             node2.addNeighbor(node1);
-        }
-    }
-
-    public void start() {
-        for (Node node : nodes) {
-            Thread thread = new Thread(node);
-            System.out.println("Starting thread for node " + node.getId());
-            thread.start();
         }
     }
 
@@ -71,18 +64,16 @@ public class Network {
     }
 
     public void printColors() {
-        for (Node node : nodes) {
-            System.out.println("Node " + node.getId() + " ima boju " + node.getColor());
-        }
+        System.out.println("Results of the graph coloring:");
+        nodes.forEach(node -> System.out.printf("Node %d has the color %d%n", node.getId(), node.getColor()));
     }
 
     public void printMisResults() {
         System.out.println("Maximal Independent Set (MIS) results:");
-        for (Node node : nodes) {
-            if (node.getInMIS().get()) {
-                System.out.println("Node " + node.getId() + " is in the MIS.");
-            }
-        }
+        nodes.stream()
+                .filter(node -> node.getInMIS().get())
+                .map(Node::getId)
+                .forEach(id -> System.out.println("Node " + id + " is in the MIS."));
     }
 
     public void printColorMisResults() {
@@ -91,5 +82,11 @@ public class Network {
                 .filter(Node::getOwnSelection)
                 .map(Node::getId)
                 .forEach(id -> System.out.println("Node " + id + " is in the MIS."));
+    }
+
+    public Optional<Node> getNodeById(int id) {
+        return nodes.stream()
+                .filter(node -> node.getId() == id)
+                .findFirst();
     }
 }
