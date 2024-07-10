@@ -3,6 +3,7 @@ package com.project.network;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 public class Node implements Runnable {
     public int id;
@@ -17,23 +18,42 @@ public class Node implements Runnable {
     private AtomicBoolean inMIS;
     private AtomicBoolean active;
     public int randomValue;
-    private Map<Integer, Integer> receivedColors;
+    public Map<Integer, Integer> receivedColors;
+    public Map<Integer, Boolean> selected;
     private int color;
     private boolean colored;
     private String algorithm;
     private int maxColors;
-
     public boolean isSmallest;
 
     public Node(int id, String algorithm, int maxColors) {
         this.id = id;
         this.receivedColors = new HashMap<>();
+        this.selected = new HashMap<>();
         this.color = id; // 0 means uncolored
         this.colored = false;
         this.algorithm = algorithm;
         this.maxColors = maxColors;
         this.inMIS = new AtomicBoolean(false);
         this.active = new AtomicBoolean(true);
+    }
+
+    public void initSelected()
+    {
+        this.selected = this.getNeighbors().stream()
+                .collect(Collectors.toMap(Node::getId, neighbor -> false));
+        this.selected.put(this.getId(), false);
+    }
+    public boolean areAllNeighborsSelectedFalse() {
+        return this.getNeighbors().stream()
+                .noneMatch(neighbor -> selected.get(neighbor.getId()));
+    }
+
+    public void setOwnSelectionTrue() {
+        this.selected.put(this.getId(), true);
+    }
+    public boolean getOwnSelection() {
+        return this.selected.get(this.getId());
     }
     public boolean isInMIS() {
         return inMIS.get();
@@ -93,12 +113,27 @@ public class Node implements Runnable {
         return color;
     }
 
+    public void setColor(int color) {
+        this.color = color;
+    }
+
     public void sendMessage(Node target, Message message) {
         if (neighbors.contains(target)) {
             System.out.println("Node " + id + " sending message to " + target.getId() + ": " + message.getContent());
             target.receiveMessage(message);
         }
     }
+
+    public CompletableFuture<Void> sendMessageAsync(Node target, Message message) {
+        if (neighbors.contains(target)) {
+            System.out.println("Node " + id + " sending message to " + target.getId() + ": " + message.getContent());
+            return CompletableFuture.runAsync(() -> target.receiveMessage(message));
+        } else {
+            return CompletableFuture.completedFuture(null); // Return completed future if target is not a neighbor
+        }
+    }
+
+
 
     public void receiveMessage(Message message) {
         messageQueue.offer(message);
@@ -109,17 +144,23 @@ public class Node implements Runnable {
 
     public List<Message> receiveAllMessages() {
         List<Message> messages = new ArrayList<>();
-        Set<Node> receivedFrom = new HashSet<>();
-        // we assume no more than 1 message per round
-        while (receivedFrom.size() < com_with.size()) {
+        Map<Node, Integer> receivedCounts = new HashMap<>();
+
+        while (receivedCounts.size() < neighbors.size()) {
             try {
                 messageSemaphore.acquire();
 
                 Message message;
                 while ((message = messageQueue.poll()) != null) {
-                    messages.add(message);
-                    receivedFrom.add(message.getSender());
-                    System.out.println("Node " + id + " received message: " + message.getContent());
+                    Node sender = message.getSender();
+                    receivedCounts.put(sender, receivedCounts.getOrDefault(sender, 0) + 1);
+
+                    if (receivedCounts.get(sender) == 1) {
+                        messages.add(message);
+                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + sender.getId());
+                    } else {
+                        System.out.println("Node " + id + " received duplicate message from Node " + sender.getId() + " and ignored it.");
+                    }
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -164,8 +205,6 @@ public class Node implements Runnable {
             System.out.println("Node " + id + " running coloring algorithm.");
             while (!Thread.currentThread().isInterrupted()) {
                 System.out.println("Node " + id + " is in the thread loop.");
-                processMessages();
-                runColoringAlgorithm();
                 try {
                     Thread.sleep(200); 
                 } catch (InterruptedException e) {
@@ -178,61 +217,64 @@ public class Node implements Runnable {
         }
     }
 
-    private synchronized void processMessages() {
-        //System.out.println("Node " + id + " starts processing messages. Initial queue size: " + messageQueue.size());
-//        while (!messageQueue.isEmpty()) {
-//            System.out.println("Node " + id + " has " + messageQueue.size() + " messages left to process.");
-//            //Message message = messageQueue.remove(0);
-//            // Message message = messageQueue.poll();
-//            System.out.println("Node " + id + " processed message: " + message.getContent());
-//
-//            String[] parts = message.getContent().split(" ");
-//            String messageType = parts[0];
-//            if ("INIT".equals(messageType) || "COLOR".equals(messageType)) {
-//                int neighborId = Integer.parseInt(parts[1]);
-//                int neighborColor = Integer.parseInt(parts[2]);
-//                receivedColors.put(neighborId, neighborColor);
-//                System.out.println("Node " + id + " received color " + neighborColor + " from neighbor " + neighborId);
-//            }
-//        }
-        //System.out.println("Node " + id + " finished processing messages. Queue size now: " + messageQueue.size());
-    }
 
-    private void runColoringAlgorithm() {
-        System.out.println("Node " + id + " in coloring algorithm.");
-        for (int ri = 2; ri <= maxColors; ri++) {
-            System.out.println("Node " + id + " in round " + ri);
-            if (color == ri) {
-                int newColor = 1;
-                HashSet<Integer> usedColors = new HashSet<>(receivedColors.values());
-                while (usedColors.contains(newColor)) {
-                    newColor++;
+    public void waitForNeighboursColor(Node neighbor, int current_round) {
+
+        while (true) {
+            try {
+                messageSemaphore.acquire();
+
+                Message message;
+                boolean foundValidMessage = false;
+                while ((message = messageQueue.peek()) != null) {
+                    if (message.getSender() == neighbor && message.getRound() == current_round && message.getType() == Message.Type.COLOR) {
+                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + neighbor.getId());
+                        foundValidMessage = true;
+                        this.receivedColors.put(message.getSender().getId(), Integer.parseInt(message.getContent()));
+                        break;
+                    } else {
+                        messageQueue.offer(messageQueue.poll());
+                        messageSemaphore.release();
+                    }
                 }
-                color = newColor;
-                colored = true;
-                //System.out.println("Node " + id + " colored with color: " + color);
-            }
 
-            for (Node neighbor : neighbors) {
-                Message message = new Message("COLOR " + id + " " + color, this, neighbor);
-                sendMessage(neighbor, message);
-                System.out.println("Node " + id + " sending COLOR message to " + neighbor.getId());
-            }
-
-            for (Node neighbor : neighbors) {
-                while (!receivedColors.containsKey(neighbor.getId()) || receivedColors.get(neighbor.getId()) != color) {
-                    //System.out.println("Node " + id + " waiting to receive COLOR from " + neighbor.getId());
-                    processMessages();
+                if (foundValidMessage) {
+                    break;
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
             }
         }
+    }
 
-        System.out.println("LETS CHECK COLOR FOR EVERY NODE");
-        // Print the color values for each node and its neighbors
-        System.out.println("Node " + id + " final color: " + color);
-        System.out.println("Node " + id + " neighbors and their colors:");
-        for (Node neighbor : neighbors) {
-            System.out.println("Neighbor " + neighbor.getId() + " color: " + neighbor.getColor());
+    public void waitForNeighboursSelected(Node neighbor, int current_round) {
+
+        while (true) {
+            try {
+                messageSemaphore.acquire();
+
+                Message message;
+                boolean foundValidMessage = false;
+                while ((message = messageQueue.peek()) != null) {
+                    if (message.getSender() == neighbor && message.getRound() == current_round && message.getType() == Message.Type.SELECTED ) {
+                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + neighbor.getId());
+                        foundValidMessage = true;
+                        this.selected.put(message.getSender().getId(), Boolean.parseBoolean(message.getContent()));
+                        break;
+                    } else {
+                        messageQueue.offer(messageQueue.poll());
+                        messageSemaphore.release();
+                    }
+                }
+
+                if (foundValidMessage) {
+                    break;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
     }
 

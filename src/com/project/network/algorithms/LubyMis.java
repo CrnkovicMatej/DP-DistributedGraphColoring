@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
-public class LubyMis {
+public class LubyMis implements GraphAlgorithm {
     List<Node> nodes;
     int numThreads;
 
@@ -23,6 +23,7 @@ public class LubyMis {
         this.numThreads = numThreads;
     }
 
+    @Override
     public void execute()
     {
         System.out.println("Pokretanje Luby MIS algoritma");
