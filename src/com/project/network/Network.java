@@ -35,6 +35,14 @@ public class Network {
         }
     }
 
+    public int getNetworkDegree()
+    {
+        return nodes.stream()
+                .mapToInt(node -> node.getNeighbors().size())
+                .max()
+                .orElse(0);
+    }
+
 
     public boolean isConnected() {
         if (nodes.isEmpty()) {
@@ -53,11 +61,35 @@ public class Network {
     }
 
     private void dfs(Node node, boolean[] visited) {
-        visited[node.getId()] = true;
+        // due to algo implementations Node ID's start with 1
+        visited[node.getId()-1] = true;
         for (Node neighbor : node.getNeighbors()) {
-            if (!visited[neighbor.getId()]) {
+            if (!visited[neighbor.getId()-1]) {
                 dfs(neighbor, visited);
             }
         }
+    }
+
+    public void printColors() {
+        for (Node node : nodes) {
+            System.out.println("Node " + node.getId() + " ima boju " + node.getColor());
+        }
+    }
+
+    public void printMisResults() {
+        System.out.println("Maximal Independent Set (MIS) results:");
+        for (Node node : nodes) {
+            if (node.getInMIS().get()) {
+                System.out.println("Node " + node.getId() + " is in the MIS.");
+            }
+        }
+    }
+
+    public void printColorMisResults() {
+        System.out.println("Color Maximal Independent Set (MIS) results:");
+        nodes.stream()
+                .filter(Node::getOwnSelection)
+                .map(Node::getId)
+                .forEach(id -> System.out.println("Node " + id + " is in the MIS."));
     }
 }
