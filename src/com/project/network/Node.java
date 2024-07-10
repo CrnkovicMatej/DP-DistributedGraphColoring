@@ -3,6 +3,7 @@ package com.project.network;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 public class Node  {
@@ -186,65 +187,46 @@ public class Node  {
         }
         return messages;
     }
+
+    public void waitForNeighboursMessage(Node neighbor, int current_round, Message.Type messageType, BiConsumer<Message, Node> messageProcessor) {
+        while (true) {
+            try {
+                messageSemaphore.acquire();
+
+                Message message;
+                boolean foundValidMessage = false;
+                while ((message = messageQueue.peek()) != null) {
+                    if (message.getSender() == neighbor && message.getRound() == current_round && message.getType() == messageType) {
+                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + neighbor.getId());
+                        messageProcessor.accept(message, neighbor);
+                        foundValidMessage = true;
+                        break;
+                    } else {
+                        messageQueue.offer(messageQueue.poll());
+                        messageSemaphore.release();
+                    }
+                }
+
+                if (foundValidMessage) {
+                    break;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+    }
     public void waitForNeighboursColor(Node neighbor, int current_round) {
-
-        while (true) {
-            try {
-                messageSemaphore.acquire();
-
-                Message message;
-                boolean foundValidMessage = false;
-                while ((message = messageQueue.peek()) != null) {
-                    if (message.getSender() == neighbor && message.getRound() == current_round && message.getType() == Message.Type.COLOR) {
-                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + neighbor.getId());
-                        foundValidMessage = true;
-                        this.receivedColors.put(message.getSender().getId(), Integer.parseInt(message.getContent()));
-                        break;
-                    } else {
-                        messageQueue.offer(messageQueue.poll());
-                        messageSemaphore.release();
-                    }
-                }
-
-                if (foundValidMessage) {
-                    break;
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
+        waitForNeighboursMessage(neighbor, current_round, Message.Type.COLOR, (message, sender) -> {
+            this.receivedColors.put(sender.getId(), Integer.parseInt(message.getContent()));
+        });
     }
-
     public void waitForNeighboursSelected(Node neighbor, int current_round) {
-
-        while (true) {
-            try {
-                messageSemaphore.acquire();
-
-                Message message;
-                boolean foundValidMessage = false;
-                while ((message = messageQueue.peek()) != null) {
-                    if (message.getSender() == neighbor && message.getRound() == current_round && message.getType() == Message.Type.SELECTED ) {
-                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + neighbor.getId());
-                        foundValidMessage = true;
-                        this.selected.put(message.getSender().getId(), Boolean.parseBoolean(message.getContent()));
-                        break;
-                    } else {
-                        messageQueue.offer(messageQueue.poll());
-                        messageSemaphore.release();
-                    }
-                }
-
-                if (foundValidMessage) {
-                    break;
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
+        waitForNeighboursMessage(neighbor, current_round, Message.Type.SELECTED, (message, sender) -> {
+            this.selected.put(sender.getId(), Boolean.parseBoolean(message.getContent()));
+        });
     }
+
 
     public AtomicBoolean getInMIS() {
         return inMIS;
