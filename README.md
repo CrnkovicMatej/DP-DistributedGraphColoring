@@ -26,9 +26,9 @@ The task involves describing, implementing, and testing distributed algorithms f
 ## Examples
 
   - **Maximal Independent Set (MIS):**
-  <div style="display: flex; align-items: center;">
-<div class="mermaid" style="flex: 1;">
-graph LR;
+
+```mermaid
+    graph LR;
     1 --- 2;
     1 --- 3;
     2 --- 3;
@@ -38,12 +38,12 @@ graph LR;
     5 --- 8;
     6 --- 8;
     7 --- 8;
-</div>
-<div class="text" style="flex: 1; margin: 0 20px;">
-        <p style="font-size: 18px; text-align: center;">one example of MIS is :</p>
-    </div>
-<div class="mermaid" style="flex: 1;">
-graph LR;
+```
+
+***one example of MIS is**
+
+```mermaid
+    graph LR;
     1 --- 2;
     1 --- 3;
     2 --- 3;
@@ -56,13 +56,12 @@ graph LR;
     style 1 fill:#f9f,stroke:#333,stroke-width:4px
     style 4 fill:#f9f,stroke:#333,stroke-width:4px
     style 6 fill:#f9f,stroke:#333,stroke-width:4px
-</div>
-</div>
+```
 
   - **(Δ + 1)-coloring:**
-<div style="display: flex; align-items: center;">
-<div class="mermaid" style="flex: 1;">
-graph LR;
+
+```mermaid
+    graph LR;
     1 --- 2;
     1 --- 3;
     2 --- 3;
@@ -72,12 +71,12 @@ graph LR;
     5 --- 8;
     6 --- 8;
     7 --- 8;
-</div>
-<div class="text" style="flex: 1; margin: 0 20px;">
-        <p style="font-size: 18px; text-align: center;">can be colored like this so that no two neighbours have the same color :</p>
-    </div>
-<div class="mermaid" style="flex: 1;">
-graph LR;
+```
+
+***can be colored like this so that no two neighbours have the same color :**
+
+```mermaid
+    graph LR;
     1 --- 2;
     1 --- 3;
     2 --- 3;
@@ -95,10 +94,7 @@ graph LR;
     style 6 fill:#FF6347
     style 7 fill:#FFFF00
     style 8 fill:#1E90FF
-</div>
-</div>
-
-
+```
 
 ## Implementation Details
 
