@@ -32,34 +32,26 @@ public class LubyMis implements GraphAlgorithm {
 
         List<Future<?>> futures = new ArrayList<>();
 
+        initNodesForExecution();
+        AtomicBoolean hasActiveNodes = new AtomicBoolean(false);
         while (true) {
-            AtomicBoolean hasActiveNodes = new AtomicBoolean(false);
-
-            initNodesForExecution();
-
+            hasActiveNodes.set(false);
             // Round r: Nodes generate random values and send to neighbors
-            generateRandomValuesAndSendMessages(executor, random, futures, hasActiveNodes);
-
-            // Process received random values
-            processReceivedRandomValues(executor, futures);
+            processFirstRound(executor, random, futures, hasActiveNodes);
 
             //end of round r
             waitForFutures(futures);
 
             // Round r+1: Nodes decide if they join MIS based on neighbor random values
-            decideMISMembership(executor, futures);
+            processSecondRound(executor, futures);
 
-            recieveSelectedMessages(executor, futures);
 
             // end of round r+1
             waitForFutures(futures);
 
             // Round r+2: Nodes process elimination messages
-            processSelectedNeighbours(executor, futures);
+            processThirdRound(executor, futures);
 
-            recieveEliminatedMessages(executor, futures);
-
-            processEliminationMessages(executor, futures);
 
             // end of round r+2
             waitForFutures(futures);
@@ -75,6 +67,7 @@ public class LubyMis implements GraphAlgorithm {
     private void initNodesForExecution()
     {
         nodes.forEach(node -> node.getNeighbors().forEach(node::addCommunicator));
+        nodes.forEach(Node::initEliminated);
     }
 
     private void waitForFutures(List<Future<?>> futures) {
@@ -88,7 +81,7 @@ public class LubyMis implements GraphAlgorithm {
         futures.clear();
     }
 
-    private void generateRandomValuesAndSendMessages(ExecutorService executor, Random random, List<Future<?>> futures, AtomicBoolean hasActiveNodes) {
+    private void processFirstRound(ExecutorService executor, Random random, List<Future<?>> futures, AtomicBoolean hasActiveNodes) {
         for (Node node : nodes) {
             if (node.isActive()) {
                 hasActiveNodes.set(true);
@@ -98,112 +91,98 @@ public class LubyMis implements GraphAlgorithm {
                     for (Node communication : node.getCom_with()) {
                         node.sendMessage(communication, new Message(Message.Type.RANDOM, String.valueOf(node.randomValue), node, communication));
                     }
-                }));
-            }
-        }
-    }
-
-    private void processReceivedRandomValues(ExecutorService executor, List<Future<?>> futures) {
-        for (Node node : nodes) {
-            if (node.isActive()) {
-                futures.add(executor.submit(() -> {
-                    node.isSmallest = true;
-                    List<Message> messages = node.receiveAllCommMessages();
-                    for (Message message : messages) {
-                        System.out.println("Vrijednost: " + Integer.valueOf(message.getContent()) + ", tip: " + message.getType());
-                        if (message.getType() == Message.Type.RANDOM && Integer.valueOf(message.getContent()) < node.randomValue) {
-                            node.isSmallest = false;
-                            break;
-                        }
+                    for (Node communication : node.getCom_with())
+                    {
+                        node.waitForNeighboursRandom(communication);
                     }
                 }));
             }
         }
     }
 
-    private void decideMISMembership(ExecutorService executor, List<Future<?>> futures) {
+    private void processSecondRound(ExecutorService executor, List<Future<?>> futures) {
         for (Node node : nodes) {
             if (node.isActive()) {
                 futures.add(executor.submit(() -> {
+                    node.isSmallest = true;
+                    for (int value : node.randomValues.values()) {
+                        if (node.randomValue >= value) {
+                            node.isSmallest = false;
+                            break;
+                        }
+                    }
                     if (node.isSmallest) {
                         System.out.println("Čvor " + node.id + " pridružuje se MIS");
                         node.setInMIS(true);
                         node.setActive(false);
                         for (Node neighbor : node.getCom_with()) {
-                            node.sendMessage(neighbor, new Message(Message.Type.SELECTED, "1", node, neighbor));
+                            node.sendMessage(neighbor, new Message(Message.Type.SELECTED, "true", node, neighbor));
                         }
+                        return;
                     } else {
                         for (Node neighbor : node.getCom_with()) {
-                            node.sendMessage(neighbor, new Message(Message.Type.SELECTED, "0", node, neighbor));
+                            node.sendMessage(neighbor, new Message(Message.Type.SELECTED, "false", node, neighbor));
                         }
                     }
-                }));
-            }
-        }
-    }
-
-    private void recieveSelectedMessages(ExecutorService executor, List<Future<?>> futures) {
-        for (Node node : nodes) {
-            if (node.isActive()) {
-                futures.add(executor.submit(() -> {
-                    node.setMessageBuffer(node.receiveAllCommMessages());
-                }));
-            }
-        }
-    }
-
-    private void processSelectedNeighbours(ExecutorService executor, List<Future<?>> futures) {
-        for (Node node : nodes) {
-            if (node.isActive()) {
-                futures.add(executor.submit(() -> {
-                    for (Message message : node.getMessageBuffer()) {
-                        if (message.getType() == Message.Type.SELECTED && message.getContent().equals("1")) {
-                            System.out.println("Čvor " + node.id + " deaktivira se zbog susjeda u MIS");
-                            node.setActive(false);
-                            for (Node neighbor : node.getCom_with()) {
-                                node.sendMessage(neighbor, new Message(Message.Type.ELIMINATED, "1", node, neighbor));
-                            }
-                            break;
-                        }
-                    }
-                    if(node.isActive()){
-                        for (Node neighbor : node.getCom_with()) {
-                            node.sendMessage(neighbor, new Message(Message.Type.ELIMINATED, "0", node, neighbor));
-                        }
-                    }
-                }));
-            }
-        }
-        waitForFutures(futures);
-    }
-
-    private void recieveEliminatedMessages(ExecutorService executor, List<Future<?>> futures) {
-        for (Node node : nodes) {
-            if (node.isActive()) {
-                futures.add(executor.submit(() -> {
-                    node.setMessageBuffer(node.receiveAllCommMessages());
-                }));
-            }
-        }
-    }
-
-    private void processEliminationMessages(ExecutorService executor, List<Future<?>> futures) {
-        for (Node node : nodes) {
-            if (node.isActive()) {
-                futures.add(executor.submit(() -> {
-                    List<Message> messages = node.getMessageBuffer();
-                    for (Message message : messages) {
-                        if (message.getType() == Message.Type.ELIMINATED && "1".equals(message.getContent())) {
-                            node.removeCommunicator(message.getSender());
-                        }
-                    }
-                    if(node.getCom_with().isEmpty())
+                    for (Node communication : node.getCom_with())
                     {
-                        node.setInMIS(true);
-                        node.setActive(false);
+                        node.waitForNeighboursSelected(communication,0);
                     }
                 }));
             }
         }
+    }
+    private void processThirdRound(ExecutorService executor, List<Future<?>> futures) {
+        for (Node node : nodes) {
+            if (node.isActive()) {
+                futures.add(executor.submit(() -> {
+                    handleNodeActivity(node);
+                }));
+            }
+        }
+    }
+
+    private void handleNodeActivity(Node node) {
+        boolean noNeighboursSelected = node.getCom_with().stream()
+                .noneMatch(neighbor -> node.selected.get(neighbor.getId()));
+
+        if (noNeighboursSelected) {
+            sendEliminationMessages(node, "false");
+        } else {
+            deactivateNode(node);
+            return;
+        }
+
+        waitForNeighboursEliminationMsg(node);
+        node.removeEliminatedNeighbors();
+
+        if (node.getCom_with().isEmpty()) {
+            joinMIS(node);
+        }
+    }
+    private void sendEliminationMessages(Node node, String messageContent) {
+        for (Node neighbor : node.getCom_with()) {
+            if (neighbor.isActive()) {
+                node.sendMessage(neighbor, new Message(Message.Type.ELIMINATED, messageContent, node, neighbor));
+            }
+        }
+    }
+    private void deactivateNode(Node node) {
+        System.out.println("Čvor " + node.getId() + " deaktivira se zbog susjeda u MIS");
+        node.setActive(false);
+        sendEliminationMessages(node, "true");
+    }
+    private void waitForNeighboursEliminationMsg(Node node) {
+        for (Node neighbor : node.getCom_with()) {
+            if (neighbor.isActive()) {
+                node.waitForNeighboursEliminated(neighbor);
+            }
+        }
+    }
+
+    private void joinMIS(Node node) {
+        System.out.println("Čvor " + node.getId() + " pridružuje se MIS jer su mu komunikacijski kanali prazni");
+        node.setInMIS(true);
+        node.setActive(false);
     }
 }

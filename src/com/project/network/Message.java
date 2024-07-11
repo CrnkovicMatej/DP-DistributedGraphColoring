@@ -21,6 +21,7 @@ public class Message {
         this.content = content;
         this.source = source;
         this.destination = destination;
+        this.round = 0;
     }
 
     public Message(Type type, String content, Node source, Node destination) {
@@ -28,6 +29,7 @@ public class Message {
         this.content = content;
         this.source = source;
         this.destination = destination;
+        this.round = 0;
     }
 
     public Message(Type type, String content, int round, Node source, Node destination) {

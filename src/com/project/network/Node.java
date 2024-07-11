@@ -14,12 +14,14 @@ public class Node  {
 
     private final Semaphore messageSemaphore = new Semaphore(0);
 
-    private List<Message> tempMessagesBuffer = new ArrayList<Message>();
     private AtomicBoolean inMIS;
     private AtomicBoolean active;
     public int randomValue;
     public Map<Integer, Integer> receivedColors;
     public Map<Integer, Boolean> selected;
+
+    public Map<Integer, Integer> randomValues;
+    public Map<Integer, Boolean> eliminated;
     private int color;
     public boolean isSmallest;
 
@@ -27,6 +29,8 @@ public class Node  {
         this.id = id;
         this.receivedColors = new HashMap<>();
         this.selected = new HashMap<>();
+        this.randomValues = new HashMap<>();
+        this.eliminated = new HashMap<>();
         this.color = id;
         this.inMIS = new AtomicBoolean(false);
         this.active = new AtomicBoolean(true);
@@ -37,6 +41,13 @@ public class Node  {
         this.selected = this.getNeighbors().stream()
                 .collect(Collectors.toMap(Node::getId, neighbor -> false));
         this.selected.put(this.getId(), false);
+    }
+
+    public void initEliminated()
+    {
+        this.eliminated = this.getNeighbors().stream()
+                .collect(Collectors.toMap(Node::getId, neighbor -> false));
+        this.eliminated.put(this.getId(), false);
     }
     public boolean areAllNeighborsSelectedFalse() {
         return this.getNeighbors().stream()
@@ -86,21 +97,15 @@ public class Node  {
         com_with.remove(comm);
     }
 
+    public void removeEliminatedNeighbors() {
+        com_with.removeIf(communicator -> eliminated.getOrDefault(communicator.getId(), false));
+    }
+
     public void addNeighbor(Node neighbor) {
         if (!neighbors.contains(neighbor)) {
             neighbors.add(neighbor);
         }
     }
-
-    public List<Message> getMessageBuffer(){
-        return tempMessagesBuffer;
-    }
-
-    public void setMessageBuffer(List<Message> messages)
-    {
-        tempMessagesBuffer =  messages;
-    }
-
     public int getColor() {
         return color;
     }
@@ -139,19 +144,7 @@ public class Node  {
         while (receivedCounts.size() < neighbors.size()) {
             try {
                 messageSemaphore.acquire();
-
-                Message message;
-                while ((message = messageQueue.poll()) != null) {
-                    Node sender = message.getSender();
-                    receivedCounts.put(sender, receivedCounts.getOrDefault(sender, 0) + 1);
-
-                    if (receivedCounts.get(sender) == 1) {
-                        messages.add(message);
-                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + sender.getId());
-                    } else {
-                        System.out.println("Node " + id + " received duplicate message from Node " + sender.getId() + " and ignored it.");
-                    }
-                }
+                processMessages(messages, receivedCounts);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -160,54 +153,27 @@ public class Node  {
         return messages;
     }
 
-    public List<Message> receiveAllCommMessages() {
-        List<Message> messages = new ArrayList<>();
-        Map<Node, Integer> receivedCounts = new HashMap<>();
+    private void processMessages(List<Message> messages, Map<Node, Integer> receivedCounts) {
+        Message message;
+        while ((message = messageQueue.poll()) != null) {
+            Node sender = message.getSender();
+            receivedCounts.put(sender, receivedCounts.getOrDefault(sender, 0) + 1);
 
-        while (receivedCounts.size() < com_with.size()) {
-            try {
-                messageSemaphore.acquire();
-
-                Message message;
-                while ((message = messageQueue.poll()) != null) {
-                    Node sender = message.getSender();
-                    receivedCounts.put(sender, receivedCounts.getOrDefault(sender, 0) + 1);
-
-                    if (receivedCounts.get(sender) == 1) {
-                        messages.add(message);
-                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + sender.getId());
-                    } else {
-                        System.out.println("Node " + id + " received duplicate message from Node " + sender.getId() + " and ignored it.");
-                    }
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
+            if (receivedCounts.get(sender) == 1) {
+                messages.add(message);
+                System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + sender.getId());
+            } else {
+                System.out.println("Node " + id + " received duplicate message from Node " + sender.getId() + " and ignored it.");
             }
         }
-        return messages;
     }
+
 
     public void waitForNeighboursMessage(Node neighbor, int current_round, Message.Type messageType, BiConsumer<Message, Node> messageProcessor) {
         while (true) {
             try {
                 messageSemaphore.acquire();
-
-                Message message;
-                boolean foundValidMessage = false;
-                while ((message = messageQueue.peek()) != null) {
-                    if (message.getSender() == neighbor && message.getRound() == current_round && message.getType() == messageType) {
-                        System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + neighbor.getId());
-                        messageProcessor.accept(message, neighbor);
-                        foundValidMessage = true;
-                        break;
-                    } else {
-                        messageQueue.offer(messageQueue.poll());
-                        messageSemaphore.release();
-                    }
-                }
-
-                if (foundValidMessage) {
+                if (processMessageQueue(neighbor, current_round, messageType, messageProcessor)) {
                     break;
                 }
             } catch (InterruptedException e) {
@@ -215,6 +181,26 @@ public class Node  {
                 break;
             }
         }
+    }
+
+    private boolean processMessageQueue(Node neighbor, int current_round, Message.Type messageType, BiConsumer<Message, Node> messageProcessor) {
+        Message message;
+        while ((message = messageQueue.peek()) != null) {
+            if (message.getSender() == neighbor && message.getRound() == current_round && message.getType() == messageType) {
+                System.out.println("Node " + id + " received message: " + message.getContent() + " from Node " + neighbor.getId());
+                messageProcessor.accept(message, neighbor);
+                return true;
+            } else {
+                messageQueue.offer(messageQueue.poll());
+                messageSemaphore.release();
+            }
+        }
+        return false;
+    }
+    public void waitForNeighboursRandom(Node neighbor) {
+        waitForNeighboursMessage(neighbor, 0, Message.Type.RANDOM, (message, sender) -> {
+            this.randomValues.put(sender.getId(), Integer.parseInt(message.getContent()));
+        });
     }
     public void waitForNeighboursColor(Node neighbor, int current_round) {
         waitForNeighboursMessage(neighbor, current_round, Message.Type.COLOR, (message, sender) -> {
@@ -227,6 +213,11 @@ public class Node  {
         });
     }
 
+    public void waitForNeighboursEliminated(Node neighbor) {
+        waitForNeighboursMessage(neighbor, 0, Message.Type.ELIMINATED, (message, sender) -> {
+            this.eliminated.put(sender.getId(), Boolean.parseBoolean(message.getContent()));
+        });
+    }
 
     public AtomicBoolean getInMIS() {
         return inMIS;
