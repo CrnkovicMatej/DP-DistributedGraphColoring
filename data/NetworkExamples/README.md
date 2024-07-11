@@ -12,9 +12,14 @@ Two CSV files are used to define the network topology: `nodes.csv` and `links.cs
     - Example: 
       ```
       id
-      0
       1
       2
+      3
+      4
+      5
+      6
+      7
+      8
       ```
   - Each subsequent row represents a node identifier.
 
@@ -31,9 +36,27 @@ Two CSV files are used to define the network topology: `nodes.csv` and `links.cs
   - Example:
     ```
     source,destination
-    0,1
     1,2
-    2,0
+    1,3
+    2,3
+    3,6
+    4,5
+    5,7
+    5,8
+    6,8
+    7,8
+    ```
+    ```mermaid
+    graph LR;
+      1 --- 2;
+      1 --- 3;
+      2 --- 3;
+      3 --- 6;
+      4 --- 5;
+      5 --- 7;
+      5 --- 8;
+      6 --- 8;
+      7 --- 8;
     ```
   - Each row represents a directed link from the `source` node to the `destination` node.
 
