@@ -26,26 +26,24 @@ public class ColorMis implements GraphAlgorithm {
 
     @Override
     public void execute() {
+        System.out.println("Starting the m-coloring to MIS algorithm");
         nodes.forEach(Node::initSelected);
 
         ExecutorService executor = newFixedThreadPool(numThreads);
         List<Future<?>> futures = new ArrayList<>();
-        System.out.println("ulazim u asinkrone runde");
         // Asynchronous rounds for each node
         for (Node node : nodes) {
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                 for (int current_round = 1; current_round <= maxColors; current_round++) {
-                    System.out.println("runda je " + current_round + " a Node je " + node.getId());
                     if (node.getColor() == current_round && node.areAllNeighborsSelectedFalse()) {
                         node.setOwnSelectionTrue();
-                        System.out.println("čvor se postavlja na true" + node.getId());
                     }
                     for (Node neighbor : node.getNeighbors()) {
-                        node.sendMessageAsync(neighbor, new Message(Message.Type.SELECTED, String.valueOf(node.getOwnSelection()), current_round, node, neighbor));
+                        node.getMessageHandler().sendMessageAsync(neighbor, new Message(Message.Type.SELECTED, String.valueOf(node.getOwnSelection()), current_round, node, neighbor));
                     }
                     for (Node neighbor : node.getNeighbors())
                     {
-                        node.waitForNeighboursSelected(neighbor, current_round);
+                        node.getMessageHandler().waitForNeighboursSelected(neighbor, current_round);
                     }
                 }
             }, executor);

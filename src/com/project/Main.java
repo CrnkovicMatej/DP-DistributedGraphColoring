@@ -17,14 +17,13 @@ import java.util.Map;
 public class Main {
     public static void main(String[] args) throws InterruptedException {
         if (args.length < 3) {
-            System.out.println("Usage: java com.project.Main <nodes_file_path> <links_file_path> <algorithm> [<maxColors>]");
+            System.out.println("Usage: java com.project.Main <nodes_file_path> <links_file_path> <algorithm> ");
             return;
         }
 
         String nodesFilePath = args[0];
         String linksFilePath = args[1];
         String algorithm = args[2];
-        int maxColors = args.length >= 4 ? Integer.parseInt(args[3]) : Integer.MAX_VALUE;
 
         NetworkLoader loader = new NetworkLoader(nodesFilePath, linksFilePath);
         Network network;
@@ -49,13 +48,7 @@ public class Main {
             network.printMisResults();
         } else if ("color".equalsIgnoreCase(algorithm)) {
             int degree = network.getNetworkDegree();
-            if (maxColors < degree + 1) {
-                System.out.println("Number of max colors must be greater than degree + 1 of graph which is : " + degree);
-                System.out.println("It is also suggested that max colors is smaller than size of graph which is : " + nodes.size());
-                return;
-            }
-
-            graphAlgorithm = new DeltaColouring(nodes, nodes.size(), degree, maxColors);
+            graphAlgorithm = new DeltaColouring(nodes, nodes.size(), degree);
             executeAlgorithm(graphAlgorithm);
             network.printColors();
         } else if("colorMIS".equalsIgnoreCase(algorithm)){

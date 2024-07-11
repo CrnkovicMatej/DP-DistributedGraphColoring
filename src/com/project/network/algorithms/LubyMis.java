@@ -26,7 +26,7 @@ public class LubyMis implements GraphAlgorithm {
     @Override
     public void execute()
     {
-        System.out.println("Pokretanje Luby MIS algoritma");
+        System.out.println("Starting the Luby maximal independent set algorithm");
         ExecutorService executor = newFixedThreadPool(numThreads);
         Random random = new Random();
 
@@ -87,13 +87,12 @@ public class LubyMis implements GraphAlgorithm {
                 hasActiveNodes.set(true);
                 futures.add(executor.submit(() -> {
                     node.randomValue = random.nextInt(Integer.MAX_VALUE);
-                    System.out.println("Čvor " + node.id + " generirao slučajnu vrijednost: " + node.randomValue);
                     for (Node communication : node.getCom_with()) {
-                        node.sendMessage(communication, new Message(Message.Type.RANDOM, String.valueOf(node.randomValue), node, communication));
+                        node.getMessageHandler().sendMessage(communication, new Message(Message.Type.RANDOM, String.valueOf(node.randomValue), node, communication));
                     }
                     for (Node communication : node.getCom_with())
                     {
-                        node.waitForNeighboursRandom(communication);
+                        node.getMessageHandler().waitForNeighboursRandom(communication);
                     }
                 }));
             }
@@ -112,21 +111,21 @@ public class LubyMis implements GraphAlgorithm {
                         }
                     }
                     if (node.isSmallest) {
-                        System.out.println("Čvor " + node.id + " pridružuje se MIS");
                         node.setInMIS(true);
                         node.setActive(false);
                         for (Node neighbor : node.getCom_with()) {
-                            node.sendMessage(neighbor, new Message(Message.Type.SELECTED, "true", node, neighbor));
+                            node.getMessageHandler().sendMessage(neighbor, new Message(Message.Type.SELECTED, "true", node, neighbor));
                         }
+                        System.out.println("Process " + node.getId() + " joins MIS because it has smallest random number.");
                         return;
                     } else {
                         for (Node neighbor : node.getCom_with()) {
-                            node.sendMessage(neighbor, new Message(Message.Type.SELECTED, "false", node, neighbor));
+                            node.getMessageHandler().sendMessage(neighbor, new Message(Message.Type.SELECTED, "false", node, neighbor));
                         }
                     }
                     for (Node communication : node.getCom_with())
                     {
-                        node.waitForNeighboursSelected(communication,0);
+                        node.getMessageHandler().waitForNeighboursSelected(communication,0);
                     }
                 }));
             }
@@ -163,25 +162,25 @@ public class LubyMis implements GraphAlgorithm {
     private void sendEliminationMessages(Node node, String messageContent) {
         for (Node neighbor : node.getCom_with()) {
             if (neighbor.isActive()) {
-                node.sendMessage(neighbor, new Message(Message.Type.ELIMINATED, messageContent, node, neighbor));
+                node.getMessageHandler().sendMessage(neighbor, new Message(Message.Type.ELIMINATED, messageContent, node, neighbor));
             }
         }
     }
     private void deactivateNode(Node node) {
-        System.out.println("Čvor " + node.getId() + " deaktivira se zbog susjeda u MIS");
+        System.out.println("Process " + node.getId() + " deactivates because one of the neighbours is in MIS.");
         node.setActive(false);
         sendEliminationMessages(node, "true");
     }
     private void waitForNeighboursEliminationMsg(Node node) {
         for (Node neighbor : node.getCom_with()) {
             if (neighbor.isActive()) {
-                node.waitForNeighboursEliminated(neighbor);
+                node.getMessageHandler().waitForNeighboursEliminated(neighbor);
             }
         }
     }
 
     private void joinMIS(Node node) {
-        System.out.println("Čvor " + node.getId() + " pridružuje se MIS jer su mu komunikacijski kanali prazni");
+        System.out.println("Process " + node.getId() + " joins MIS because it no longer has active communicators.");
         node.setInMIS(true);
         node.setActive(false);
     }

@@ -14,40 +14,35 @@ public class DeltaColouring implements GraphAlgorithm {
 
     int degree;
 
-    int maxColors;
 
-    public DeltaColouring(List<Node> nodes, int numThreads, int degree, int maxColors){
+    public DeltaColouring(List<Node> nodes, int numThreads, int degree){
         this.nodes = nodes;
         this.numThreads = numThreads;
         this.degree = degree;
-        this.maxColors = maxColors;
     }
 
     @Override
     public void execute()
     {
-        System.out.println("Pokretanje coloring MIS algoritma");
+        System.out.println("Starting the (degree+1)-coloring algorithm");
         ExecutorService executor = newFixedThreadPool(numThreads);
         List<Future<?>> futures = new ArrayList<>();
-        CompletionService<Void> completionService = new ExecutorCompletionService<>(executor);
 
         for (Node node : nodes) {
             futures.add(executor.submit(() -> {
                 for (Node neighbour : node.getNeighbors()) {
-                    node.sendMessage(neighbour, new Message(Message.Type.INIT, String.valueOf(node.getColor()), node, neighbour));
+                    node.getMessageHandler().sendMessage(neighbour, new Message(Message.Type.INIT, String.valueOf(node.getColor()), node, neighbour));
                 }
 
             }));
 
         }
         waitForFutures(futures);
-        System.out.println("okej okej");
 
         for (Node node : nodes) {
             futures.add(executor.submit(() -> {
-                List<Message> messages = node.receiveAllMessages();
+                List<Message> messages = node.getMessageHandler().receiveAllMessages();
                 for (Message message : messages) {
-                    System.out.println("Vrijednost: " + Integer.valueOf(message.getContent()) + ", tip: " + message.getType());
                     if (message.getType() == Message.Type.INIT ) {
                         int senderId = message.getSender().getId();
                         int color = Integer.parseInt(message.getContent());
@@ -58,22 +53,21 @@ public class DeltaColouring implements GraphAlgorithm {
         }
         waitForFutures(futures);
 
-        System.out.println("ulazim u asinkrone runde");
+
         // Asynchronous rounds for each node
         for (Node node : nodes) {
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                 for (int current_round = degree + 2; current_round <= nodes.size()+1; current_round++) {
-                    System.out.println("runda je " + current_round + " a Node je " + node.getId());
                     if (node.getColor() == current_round) {
                         int newColor = findSmallestAvailableColor(node);
                         node.setColor(newColor);
                     }
                     for (Node neighbor : node.getNeighbors()) {
-                        node.sendMessageAsync(neighbor, new Message(Message.Type.COLOR, String.valueOf(node.getColor()), current_round, node, neighbor));
+                        node.getMessageHandler().sendMessageAsync(neighbor, new Message(Message.Type.COLOR, String.valueOf(node.getColor()), current_round, node, neighbor));
                     }
                     for (Node neighbor : node.getNeighbors())
                     {
-                        node.waitForNeighboursColor(neighbor, current_round);
+                        node.getMessageHandler().waitForNeighboursColor(neighbor, current_round);
                     }
                 }
             }, executor);
