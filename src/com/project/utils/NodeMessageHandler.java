@@ -19,6 +19,11 @@ public class NodeMessageHandler {
         this.messageQueue = messageQueue;
     }
 
+    public void flush()
+    {
+        messageQueue.clear();
+    }
+
     public void sendMessage(Node target, Message message) {
         if (node.getNeighbors().contains(target)) {
             target.getMessageHandler().receiveMessage(message);
@@ -70,8 +75,8 @@ public class NodeMessageHandler {
     public void waitForNeighboursMessage(Node neighbor, int current_round, Message.Type messageType, BiConsumer<Message, Node> messageProcessor) {
         while (true) {
             try {
-                messageSemaphore.acquire();
                 if (processMessageQueue(neighbor, current_round, messageType, messageProcessor)) {
+                    messageSemaphore.acquire();
                     break;
                 }
             } catch (InterruptedException e) {

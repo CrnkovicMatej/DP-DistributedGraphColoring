@@ -58,6 +58,8 @@ public class Node  {
                 .noneMatch(neighbor -> selected.get(neighbor.getId()));
     }
 
+    public void setRandomValue(int newRandom) { randomValue=newRandom; }
+
     public void setOwnSelectionTrue() {
         this.selected.put(this.getId(), true);
     }

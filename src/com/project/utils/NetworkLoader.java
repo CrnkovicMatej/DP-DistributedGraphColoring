@@ -17,6 +17,10 @@ public class NetworkLoader {
         this.linksFilePath = linksFilePath;
     }
 
+    public boolean validateTopology(Network network) {
+        return network.isConnected();
+    }
+
     public Network loadTopology() throws IOException {
         Network network = new Network();
         loadNodes(network);
@@ -30,8 +34,11 @@ public class NetworkLoader {
             while ((line = reader.readLine()) != null) {
                 if (!line.equals("id")) {
                     int id = Integer.parseInt(line.trim());
-                    Node node = new Node(id);
-                    network.addNode(node);
+                    Optional<Node> existingNode = network.getNodeById(id);
+                    if (existingNode.isEmpty()) {
+                        Node node = new Node(id);
+                        network.addNode(node);
+                    }
                 }
             }
         }
@@ -55,8 +62,5 @@ public class NetworkLoader {
                 }
             }
         }
-    }
-    public boolean validateTopology(Network network) {
-        return network.isConnected();
     }
 }

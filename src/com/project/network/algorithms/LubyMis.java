@@ -2,10 +2,12 @@ package com.project.network.algorithms;
 
 import com.project.network.Message;
 import com.project.network.Node;
+import com.project.utils.NodeMessageHandler;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -86,15 +88,21 @@ public class LubyMis implements GraphAlgorithm {
             if (node.isActive()) {
                 hasActiveNodes.set(true);
                 futures.add(executor.submit(() -> {
-                    node.randomValue = random.nextInt(Integer.MAX_VALUE);
-                    for (Node communication : node.getCom_with()) {
-                        node.getMessageHandler().sendMessage(communication, new Message(Message.Type.RANDOM, String.valueOf(node.randomValue), node, communication));
-                    }
-                    for (Node communication : node.getCom_with())
-                    {
-                        node.getMessageHandler().waitForNeighboursRandom(communication);
-                    }
-                }));
+                    try {
+                        int randomValue = random.nextInt(Integer.MAX_VALUE);
+                        node.setRandomValue(randomValue);
+                        Set<Node> communications = node.getCom_with();
+                        NodeMessageHandler messageHandler = node.getMessageHandler();
+                        for (Node communication : communications) {
+                            messageHandler.sendMessage(communication, new Message(Message.Type.RANDOM, String.valueOf(randomValue), node, communication));
+                        }
+                        node.randomValues.clear();
+                        for (Node communication : communications) {
+                            messageHandler.waitForNeighboursRandom(communication);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }}));
             }
         }
     }
@@ -173,9 +181,7 @@ public class LubyMis implements GraphAlgorithm {
     }
     private void waitForNeighboursEliminationMsg(Node node) {
         for (Node neighbor : node.getCom_with()) {
-            if (neighbor.isActive()) {
-                node.getMessageHandler().waitForNeighboursEliminated(neighbor);
-            }
+            node.getMessageHandler().waitForNeighboursEliminated(neighbor);
         }
     }
 
