@@ -35,7 +35,7 @@ public class ColorMis implements GraphAlgorithm {
         for (Node node : nodes) {
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                 for (int current_round = 1; current_round <= maxColors; current_round++) {
-                    if (node.getColor() == current_round && node.areAllNeighborsSelectedFalse()) {
+                    if (node.getColor() == current_round && node.noneOfAllNeighborsSelected()) {
                         node.setOwnSelectionTrue();
                     }
                     for (Node neighbor : node.getNeighbors()) {

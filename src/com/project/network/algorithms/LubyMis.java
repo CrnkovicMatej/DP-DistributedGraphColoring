@@ -124,7 +124,7 @@ public class LubyMis implements GraphAlgorithm {
                         for (Node neighbor : node.getCom_with()) {
                             node.getMessageHandler().sendMessage(neighbor, new Message(Message.Type.SELECTED, "true", node, neighbor));
                         }
-                        System.out.println("Process " + node.getId() + " joins MIS because it has smallest random number.");
+                        //System.out.println("Process " + node.getId() + " joins MIS because it has smallest random number.");
                         return;
                     } else {
                         for (Node neighbor : node.getCom_with()) {
@@ -175,7 +175,7 @@ public class LubyMis implements GraphAlgorithm {
         }
     }
     private void deactivateNode(Node node) {
-        System.out.println("Process " + node.getId() + " deactivates because one of the neighbours is in MIS.");
+        //System.out.println("Process " + node.getId() + " deactivates because one of the neighbours is in MIS.");
         node.setActive(false);
         sendEliminationMessages(node, "true");
     }
@@ -186,7 +186,7 @@ public class LubyMis implements GraphAlgorithm {
     }
 
     private void joinMIS(Node node) {
-        System.out.println("Process " + node.getId() + " joins MIS because it no longer has active communicators.");
+        //System.out.println("Process " + node.getId() + " joins MIS because it no longer has active communicators.");
         node.setInMIS(true);
         node.setActive(false);
     }

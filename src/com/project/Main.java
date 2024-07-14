@@ -35,7 +35,8 @@ public class Main {
             return;
         }
         if (!loader.validateTopology(network)) {
-            System.out.println("The network is not connected.");
+            System.out.println("The provided network is not connected. Please make sure that the graph you've entered via nodes and links files has at least" +
+                    " one path between each of its nodes.");
             return;
         }
 
